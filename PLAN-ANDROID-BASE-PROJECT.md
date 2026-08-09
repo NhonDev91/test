@@ -4,6 +4,10 @@
 > "thực hiện kế hoạch trong PLAN-ANDROID-BASE-PROJECT.md", hãy đọc kỹ toàn bộ file và thực thi
 > theo đúng các giai đoạn bên dưới. Mọi quyết định kiến trúc trong file này đã được thảo luận
 > và chốt — không cần hỏi lại, trừ các mục đánh dấu ❓ (cần người dùng cung cấp).
+>
+> **Công cụ bắt buộc trong suốt quá trình**: dùng workflow của **Superpowers**
+> (brainstorm/plan → implement → test) cho mọi giai đoạn, và chạy **review hai lớp**
+> tại các chốt review ghi trong từng giai đoạn (xem mục "Quy trình review hai lớp").
 
 ## 1. Mục tiêu
 
@@ -63,6 +67,22 @@ tham khảo NiA) là rủi ro một lần, kiểm soát được bằng luật v
 
 ### Giai đoạn 0 — Chuẩn bị (người dùng làm hoặc yêu cầu Claude làm)
 
+**0a. Cài công cụ (làm TRƯỚC khi viết bất kỳ dòng code nào):**
+
+1. **Superpowers**: trong Claude Code chạy
+   `/plugin marketplace add obra/superpowers-marketplace`, rồi cài plugin `superpowers`
+   từ marketplace đó. Xác nhận cài thành công (các skill brainstorm/plan/TDD xuất hiện).
+2. **Codex review plugin**: cài plugin review bằng Codex mà người dùng vẫn dùng
+   (❓ nếu chưa rõ tên plugin/marketplace, hỏi người dùng đúng một lần rồi ghi lại vào đây).
+   - ⚠️ **Việc người dùng phải tự làm**: cài OpenAI Codex CLI và đăng nhập tài khoản OpenAI
+     (`codex login` hoặc tương đương) — Claude không thể đăng nhập thay. Trước khi bắt đầu,
+     Claude kiểm tra Codex CLI đã sẵn sàng chưa (ví dụ chạy thử một lệnh review nhỏ);
+     nếu chưa, dừng lại yêu cầu người dùng đăng nhập rồi mới tiếp tục.
+3. Xác nhận **Figma MCP** đã kết nối (cần cho giai đoạn vận hành sau này, không bắt buộc
+   cho việc dựng base).
+
+**0b. Chuẩn bị mã nguồn:**
+
 1. Clone hai repo thành thư mục anh em:
    ```bash
    git clone -b multimodule https://github.com/android/architecture-templates.git <thư-mục-base-project>
@@ -86,6 +106,9 @@ tham khảo NiA) là rủi ro một lần, kiểm soát được bằng luật v
    (Button, TextField, TopBar, LoadingIndicator, ErrorView...) — tham khảo cách tổ chức
    của NiA `:core:designsystem` nhưng chỉ lấy cấu trúc, không copy branding.
 7. Build xanh: `./gradlew assembleDebug` + `./gradlew test` pass.
+8. 🔍 **CHỐT REVIEW #1**: chạy quy trình review hai lớp (mục 4b) cho toàn bộ nền vừa dựng
+   trước khi sang Giai đoạn 2. Lỗi khuôn ở tầng này sẽ nhân bản vào mọi feature mẫu,
+   nên phải xử lý hết finding ở đây trước.
 
 ### Giai đoạn 2 — Xây bộ feature mẫu (harvest từ NiA có kỷ luật)
 
@@ -100,8 +123,31 @@ ViewModel + UseCase. Tất cả cùng MỘT khuôn — đây là yêu cầu quan
 | 3 | `:feature:settings` | Màn tĩnh + đọc/ghi DataStore | Tham khảo NiA settings dialog, chuyển thành màn hình |
 | 4 | `:feature:home` | ViewPager/Tab, nhiều màn con chia sẻ state | HorizontalPager + TabRow |
 
-Sau mỗi feature: chạy build + test + detekt, tự review lại xem có đúng khuôn feature trước không
-rồi mới sang feature tiếp theo.
+Sau mỗi feature: chạy build + test + detekt, rồi 🔍 **CHỐT REVIEW** theo quy trình hai lớp
+(mục 4b) — xử lý hết finding rồi mới sang feature tiếp theo. Đặc biệt với feature mẫu #1
+(`:feature:login`): đây là khuôn gốc cho mọi feature sau, review kỹ nhất.
+
+### 4b. Quy trình review hai lớp (áp dụng tại mọi chốt 🔍)
+
+Mỗi chốt review gồm hai lớp, chạy tuần tự:
+
+1. **Lớp 1 — Claude tự review** (dùng skill review của Superpowers hoặc `/code-review`):
+   review diff của giai đoạn vừa làm theo tiêu chí bên dưới, sửa các finding xác đáng.
+2. **Lớp 2 — Codex cross-review**: gọi Codex review plugin trên cùng phạm vi code.
+   **BẮT BUỘC** kèm tiêu chí vào prompt review, không review trần. Prompt mẫu:
+
+   > Review phần code sau theo tiêu chí trong `CLAUDE.md` và checklist mục 5 của
+   > `PLAN-ANDROID-BASE-PROJECT.md`, tập trung: (1) feature có đúng khuôn của
+   > `:feature:login` không — cấu trúc file, cách viết UiState, error handling;
+   > (2) vi phạm ranh giới dependency giữa các module; (3) unit test rỗng hoặc
+   > test không assert gì thực chất; (4) bug logic trong validation/CRUD.
+
+3. **Xử lý finding**: sửa các finding đúng; finding sai hoặc không áp dụng thì ghi lý do
+   bỏ qua vào báo cáo cuối phiên (không im lặng bỏ qua). Nếu hai lớp review mâu thuẫn
+   nhau, ưu tiên phương án khớp với khuôn hiện có của repo.
+4. **Trọng tài cuối cùng luôn là build**: sau khi sửa theo review, chạy lại
+   `./gradlew assembleDebug test detekt ktlintCheck` — xanh mới được đóng chốt.
+   Review tĩnh (kể cả của Codex) không thay được build thật.
 
 ### Giai đoạn 3 — Viết CLAUDE.md (bắt buộc, là linh hồn của base project)
 
@@ -119,7 +165,9 @@ Tạo `CLAUDE.md` ở root với các phần:
      trong `settings.gradle.kts`, nối navigation...)
 4. **Luật**: "Kiến trúc và convention của repo này là chuẩn duy nhất. Không tự ý đổi
    thư viện/pattern. Mọi màn hình mới phải có UiState sealed + unit test ViewModel.
-   Chạy `./gradlew detekt ktlintCheck test` trước khi coi là xong."
+   Chạy `./gradlew detekt ktlintCheck test` trước khi coi là xong. Mọi feature mới
+   phải qua review hai lớp (tự review + Codex review kèm tiêu chí CLAUDE.md) trước
+   khi coi là hoàn thành."
 5. **Lệnh thường dùng**: build, test, lint, chạy app.
 
 ### Giai đoạn 4 — Cắt NiA & quy trình vận hành
@@ -129,7 +177,8 @@ Tạo `CLAUDE.md` ở root với các phần:
    - Mở session Claude Code mới trỏ vào base project (hoặc project con sinh ra từ base).
    - Prompt mẫu: *"Implement màn hình X theo design Figma <link>, tuân thủ kiến trúc trong
      CLAUDE.md, làm theo pattern của `:feature:<mẫu-phù-hợp>`."*
-   - Claude dùng Figma MCP đọc design context, code theo khuôn, chạy build + test + lint.
+   - Claude dùng Figma MCP đọc design context, code theo khuôn, chạy build + test + lint,
+     rồi chạy review hai lớp (mục 4b) trước khi báo hoàn thành.
 3. Khi nhân rộng cho công ty: mỗi project mới = copy base project (hoặc dùng làm template
    repo trên GitHub), đổi package name, giữ nguyên CLAUDE.md và bộ feature mẫu trong
    giai đoạn đầu để Claude soi, xóa dần mẫu khi feature thật thay thế đủ.
@@ -141,6 +190,8 @@ Tạo `CLAUDE.md` ở root với các phần:
 - [ ] `./gradlew detekt ktlintCheck` xanh
 - [ ] 4 feature mẫu cùng một khuôn (đối chiếu chéo cấu trúc file, cách viết UiState)
 - [ ] `CLAUDE.md` đầy đủ 5 phần ở Giai đoạn 3
+- [ ] Đã qua đủ các chốt review hai lớp (nền + từng feature mẫu), mọi finding đã sửa
+      hoặc có lý do bỏ qua được ghi lại
 - [ ] Không còn tham chiếu nào tới domain demo của template/NiA
 - [ ] Smoke test: mở session Claude Code MỚI, yêu cầu một màn hình đơn giản,
       kiểm tra Claude có tự tuân thủ khuôn mà không cần nhắc thêm không
